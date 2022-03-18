@@ -6,6 +6,6 @@ module.exports = {
         YT_MUSIC_URL: 'https://music.youtube.com',
         YT_BASE_API: 'https://www.youtube.com/youtubei/v1',
         YT_SUGGESTIONS: "https://suggestqueries.google.com/complete",
-        VT_GITHUB: "https://api.github.com/repos/Frontesque/VueTube",
+        VT_GITHUB: "https://api.github.com/repos/sudevn/VueTube",
     }
 }
