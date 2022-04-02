@@ -11,6 +11,10 @@
         {{ item.name }}
       </v-btn>
     </v-list-item>
+
+    <!--   Dev Mode Open   -->
+    <v-btn text class="entry" @click="dev()" />
+
   </div>
 </template>
 
@@ -30,6 +34,8 @@
 export default {
   data() {
     return {
+      devClicks: 0,
+
       settingsItems: [
         { name: "General", icon: "mdi-cog", to: "", disabled: true },
         { name: "Theme", icon: "mdi-brush-variant", to: "/mods/theme" },
@@ -56,5 +62,13 @@ export default {
       ],
     };
   },
+  methods: {
+    dev() {
+      this.devClicks++;
+      if (this.devClicks >= 6) {
+        this.$router.push("/mods/developer");
+      }
+    }
+  }
 };
 </script>

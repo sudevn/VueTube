@@ -1,8 +1,7 @@
 <template>
   <v-card
     style="height: 4rem !important; display: flex; box-shadow: none !important"
-    color="accent"
-    class="topNav rounded-0 pa-3"
+    class="rounded-0 pa-3 topNav transparent"
   >
     <h3 v-show="!search" class="my-auto ml-4" v-text="page" />
 
@@ -22,13 +21,26 @@
       dense
       flat
       label="Search"
-      class="searchBar"
+      style="margin-top: 1px"
+      :background-color="
+        $vuetify.theme.dark ? 'background lighten-1' : 'background darken-1'
+      "
       @input="$emit('text-changed', text)"
       @keyup.enter="$emit('search-btn', text)"
     />
 
     <v-spacer v-if="!search" />
 
+    <v-btn
+      v-if="!search"
+      v-show="page == 'Home'"
+      icon
+      tile
+      class="ml-3 mr-1 my-auto fill-height"
+      style="border-radius: 0.25rem !important"
+      @click="refreshRecommendations"
+      ><v-icon>mdi-refresh</v-icon></v-btn
+    >
     <v-btn
       icon
       tile
@@ -44,7 +56,7 @@
       class="ml-4 mr-2 my-auto fill-height"
       style="border-radius: 0.25rem !important"
       to="/settings"
-      ><v-icon>mdi-dots-vertical</v-icon></v-btn
+      ><v-icon>mdi-cog-outline</v-icon></v-btn
     >
   </v-card>
 </template>
@@ -65,23 +77,30 @@ export default {
   data: () => ({
     text: "",
   }),
+  methods: {
+    refreshRecommendations() {
+      this.$emit("scroll-to-top");
+      this.$store.commit("updateRecommendedVideos", []);
+      this.$youtube
+        .recommend()
+        .then((result) => {
+          if (result) this.$store.commit("updateRecommendedVideos", result[0]);
+        })
+        .catch((error) => this.$logger("Home Page (Nav Refresh)", error, true));
+    },
+  },
 };
 </script>
 
 <style scoped>
 .topNav {
+  /* ios notch */
+  top: env(safe-area-inset-top) !important;
   position: fixed;
   width: 100%;
-  top: 0;
-  z-index: 999;
-  /*border-radius: 0 0 1em 1em !important;*/
 }
 .topNavSearch {
   margin-bottom: -10em;
   margin-left: 2em;
-  /*transform: translateY(-2.5%);*/
-}
-.searchBar {
-  margin: 0;
 }
 </style>

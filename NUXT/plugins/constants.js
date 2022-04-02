@@ -19,7 +19,6 @@ const ytApiVal = {
 module.exports = {
   URLS: url,
   YT_API_VALUES: ytApiVal,
-
   LOGGER_NAMES: {
     search: "Search",
     autoComplete: "AutoComplete",
@@ -39,8 +38,6 @@ module.exports = {
       "x-goog-visitor-id": info.visitorData || "",
       "x-youtube-client-name": ytApiVal.CLIENTNAME,
       "x-youtube-client-version": ytApiVal.VERSION,
-      "x-origin": info.originalUrl,
-      origin: info.originalUrl,
     };
     return headers;
   },

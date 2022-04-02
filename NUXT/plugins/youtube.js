@@ -2,7 +2,8 @@
 import { Http } from "@capacitor-community/http";
 import Innertube from "./innertube";
 import constants from "./constants";
-import useRender from "./renderers";
+import rendererUtils from "./renderers";
+import { Buffer } from "buffer";
 
 //---   Logger Function   ---//
 function logger(func, data, isError = false) {
@@ -14,159 +15,42 @@ function logger(func, data, isError = false) {
   });
 }
 
-//---   Youtube Base Parser   ---//
-function youtubeParse(html, callback) {
-  //---   Replace Encoded Characters   ---///
-  html = html.replace(/\\x([0-9A-F]{2})/gi, (...items) => {
-    return String.fromCharCode(parseInt(items[1], 16));
-  });
-  //---   Properly Format JSON   ---//
-  html = html.replaceAll('\\\\"', "");
-  //---   Parse JSON   ---//
-  html = JSON.parse(html);
-
-  //---   Get Results   ---// ( Thanks To appit-online On Github ) -> https://github.com/appit-online/youtube-search/blob/master/src/lib/search.ts
-  let results;
-  if (
-    html &&
-    html.contents &&
-    html.contents.sectionListRenderer &&
-    html.contents.sectionListRenderer.contents &&
-    html.contents.sectionListRenderer.contents.length > 0 &&
-    html.contents.sectionListRenderer.contents[0].itemSectionRenderer &&
-    html.contents.sectionListRenderer.contents[0].itemSectionRenderer.contents
-      .length > 0
-  ) {
-    results =
-      html.contents.sectionListRenderer.contents[0].itemSectionRenderer
-        .contents;
-    logger(constants.LOGGER_NAMES.search, results);
-    callback(results);
-  } else {
-    try {
-      results = JSON.parse(
-        html
-          .split('{"itemSectionRenderer":{"contents":')
-          [html.split('{"itemSectionRenderer":{"contents":').length - 1].split(
-            ',"continuations":[{'
-          )[0]
-      );
-      logger(constants.LOGGER_NAMES.search, results);
-      callback(results);
-    } catch (e) {}
-    try {
-      results = JSON.parse(
-        html
-          .split('{"itemSectionRenderer":')
-          [html.split('{"itemSectionRenderer":').length - 1].split(
-            '},{"continuationItemRenderer":{'
-          )[0]
-      ).contents;
-      logger(constants.LOGGER_NAMES.search, results);
-      callback(results);
-    } catch (e) {}
+function getEncoding(contentType) {
+  const re = /charset=([^()<>@,;:\"/[\]?.=\s]*)/i;
+  const content = re.exec(contentType);
+  console.log(content);
+  if (!content || content[1].toLowerCase() == "utf-8") {
+    return "utf8";
   }
-}
-
-//---   Search Main Function   ---//
-function youtubeSearch(text, callback) {
-  Http.request({
-    method: "GET",
-    url: `${constants.URLS.YT_URL}/results`,
-    params: { q: text, hl: "en" },
-  })
-    .then((res) => {
-      //---   Get HTML Only   ---//
-      let html = res.data;
-      //---   Isolate The Script Containing Video Information   ---//
-      html = html.split("var ytInitialData = '")[1].split("';</script>")[0];
-
-      youtubeParse(html, (data) => {
-        callback(data);
-      });
-    })
-    .catch((err) => {
-      logger(constants.LOGGER_NAMES.search, err, true);
-      callback(err);
-    });
+  if (content[1].toLowerCase() == "iso-8859-1") {
+    return "latin1";
+  }
+  if (content[1].toLowerCase() == "utf16le") {
+    return "utf16le";
+  }
 }
 
 const searchModule = {
   logs: new Array(),
-
   //---   Get YouTube's Search Auto Complete   ---//
   autoComplete(text, callback) {
-    Http.request({
-      method: "GET",
-      url: `${constants.URLS.YT_SUGGESTIONS}/search`,
-      params: { client: "youtube", q: text },
+    Http.get({
+      url: `${constants.URLS.YT_SUGGESTIONS}/search?q=${encodeURIComponent(
+        text
+      )}&client=youtube&ds=yt`,
+      responseType: "arraybuffer",
     })
       .then((res) => {
-        logger(constants.LOGGER_NAMES.autoComplete, res);
-        callback(res.data);
-      })
-      .catch((err) => {
-        logger(constants.LOGGER_NAMES.autoComplete, err, true);
-        callback(err);
-      });
-  },
-
-  search(text, callback) {
-    let results = new Array();
-    youtubeSearch(text, (videos) => {
-      for (const i in videos) {
-        const video = videos[i];
-
-        if (video.compactVideoRenderer) {
-          //---   If Entry Is A Video   ---//
-          results.push({
-            id: video.compactVideoRenderer.videoId,
-            title: video.compactVideoRenderer.title.runs[0].text,
-            runtime: video.compactVideoRenderer.lengthText.runs[0].text,
-            uploaded: video.compactVideoRenderer.publishedTimeText.runs[0].text,
-            views: video.compactVideoRenderer.viewCountText.runs[0].text,
-            thumbnails: video.compactVideoRenderer.thumbnail.thumbnails,
-          });
-        } else {
-          //---   If Entry Is Not A Video   ---//
-          //logger(constants.LOGGER_NAMES.search, { type: "Error Caught Successfully", error: video }, true);
-        }
-      }
-    });
-    callback(results);
-  },
-
-  getRemainingVideoInfo(id, callback) {
-    String.prototype.decodeEscapeSequence = function () {
-      return this.replace(/\\x([0-9A-Fa-f]{2})/g, function () {
-        return String.fromCharCode(parseInt(arguments[1], 16));
-      });
-    };
-    Http.request({
-      method: "GET",
-      url: `${constants.URLS.YT_URL}/watch`,
-      params: { v: id },
-    })
-      .then((res) => {
-        let dataUpdated = res.data.decodeEscapeSequence();
-        let likes = dataUpdated
-          .split(
-            `"defaultIcon":{"iconType":"LIKE"},"defaultText":{"runs":[{"text":"`
-          )[1]
-          .split(`"}],"accessibility":`)[0];
-        let uploadDate = dataUpdated
-          .split(`"uploadDate":"`)[1]
-          .split(`}},"trackingParams":"`)[0]
-          .slice(0, -2);
-        let data = {
-          likes: likes,
-          uploadDate: uploadDate,
-        };
-        logger("vidData", data);
+        const contentType = res.headers["Content-Type"];
+        // make a new buffer object from res.data
+        const buffer = Buffer.from(res.data, "base64");
+        // convert res.data from iso-8859-1 to utf-8
+        const data = buffer.toString(getEncoding(contentType));
+        logger(constants.LOGGER_NAMES.autoComplete, data);
         callback(data);
       })
       .catch((err) => {
-        logger("codeRun", err, true);
+        logger(constants.LOGGER_NAMES.autoComplete, err, true);
         callback(err);
       });
   },
@@ -212,6 +96,20 @@ const innertubeModule = {
     }
   },
 
+  getThumbnail(id, resolution, backupThumbnail) {
+    if (resolution == "max") {
+      const url = `https://img.youtube.com/vi/${id}/maxresdefault.jpg`;
+      let img = new Image();
+      img.src = url;
+      img.onload = function () {
+        if (img.height !== 120) return url;
+      };
+    }
+    if (backupThumbnail[backupThumbnail.length - 1])
+      return backupThumbnail[backupThumbnail.length - 1].url;
+    else return `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+  },
+
   // It just works™
   // Front page recommendation
   async recommend() {
@@ -223,37 +121,21 @@ const innertubeModule = {
       response.data.contents.singleColumnBrowseResultsRenderer.tabs[0]
         .tabRenderer.content.sectionListRenderer.contents;
     const final = contents.map((shelves) => {
-      const video =
-        shelves.shelfRenderer?.content?.horizontalListRenderer?.items;
+      const video = shelves.shelfRenderer?.content?.horizontalListRenderer;
 
-      if (video)
-        return video.map((item) => {
-          if (item) {
-            const renderedItem = useRender(
-              item[Object.keys(item)[0]],
-              Object.keys(item)[0]
-            );
-            console.log(renderedItem);
-            return renderedItem;
-          } else {
-            return undefined;
-          }
-        });
+      if (video) return video;
     });
     console.log(final);
     return final;
   },
 
-  // This is the recommendations that exist under videos
-  viewRecommends(recommendList) {
-    if (recommendList)
-      return recommendList.map((item) => {
-        if (item) {
-          return useRender(item[Object.keys(item)[0]], Object.keys(item)[0]);
-        } else {
-          return undefined;
-        }
-      });
+  async search(query) {
+    try {
+      const response = await InnertubeAPI.getSearchAsync(query);
+      return response.contents.sectionListRenderer;
+    } catch (err) {
+      logger(constants.LOGGER_NAMES.search, err, true);
+    }
   },
 };
 
@@ -261,5 +143,6 @@ const innertubeModule = {
 export default ({ app }, inject) => {
   inject("youtube", { ...searchModule, ...innertubeModule });
   inject("logger", logger);
+  inject("rendererUtils", rendererUtils);
 };
 logger(constants.LOGGER_NAMES.init, "Program Started");

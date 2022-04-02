@@ -1,26 +1,8 @@
 <template>
-  <div class="accent">
-    <center v-if="videos.length == -1">
-      <v-skeleton-loader type="card-avatar, article, actions" />
-      <v-skeleton-loader type="card-avatar, article, actions" />
-    </center>
-
-    <v-list-item v-for="(video, index) in videos" :key="index" class="pa-0">
-      <v-card class="entry background" :to="`/watch?v=${video.id}`" flat>
-        <div style="position: relative">
-          <v-img :src="video.thumbnails[video.thumbnails.length - 1].url" />
-          <div
-            class="videoRuntimeFloat"
-            style="color: #fff"
-            v-text="video.runtime"
-          />
-        </div>
-        <div class="px-4 pt-4" v-text="video.title" />
-        <v-card-text class="pt-0">
-          <div v-text="`${video.views} • ${video.uploaded}`" />
-        </v-card-text>
-      </v-card>
-    </v-list-item>
+  <div class="background">
+    <!--   Video Loading Animation   -->
+    <vid-load-renderer v-if="renderer.length <= 0" />
+    <sectionListRenderer :render="renderer" />
   </div>
 </template>
 
@@ -39,18 +21,40 @@
 </style>
 
 <script>
+import sectionListRenderer from "~/components/ListRenderers/sectionListRenderer.vue";
+import VidLoadRenderer from "~/components/vidLoadRenderer.vue";
+
 export default {
+  components: {
+    sectionListRenderer,
+    VidLoadRenderer,
+  },
   data() {
     return {
-      videos: [],
+      renderer: [],
     };
   },
+  watch: {
+    // Watches for new searches while the current search page is active.
+    $route: {
+      deep: true,
+      handler(newSearch, oldSearch) {
+        if (newSearch.query.q != oldSearch.query.q) {
+          this.getSearch();
+        }
+      },
+    },
+  },
   mounted() {
-    const searchQuestion = this.$route.query.q;
-    const vm = this;
-    this.$youtube.search(searchQuestion, (data) => {
-      vm.videos = data;
-    });
+    this.getSearch();
+  },
+  methods: {
+    getSearch() {
+      const searchQuestion = this.$route.query.q;
+      this.$youtube.search(searchQuestion).then((response) => {
+        this.renderer = response;
+      });
+    },
   },
 };
 </script>

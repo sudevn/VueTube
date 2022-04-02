@@ -2,7 +2,11 @@
   <center style="padding: 1em">
     <div class="row pa-4" style="flex-direction: column">
       <div>
-        <v-img src="/icon.svg" width="100px" />
+        <v-img
+          src="/icon.svg"
+          width="100px"
+          :class="$vuetify.theme.dark ? '' : 'invert'"
+        />
       </div>
       <v-spacer />
       <div>
@@ -24,15 +28,9 @@
     <div>OS: {{ deviceInfo.operatingSystem }} ({{ deviceInfo.osVersion }})</div>
     <div>Model: {{ deviceInfo.model }}</div>
     <div>Manufacturer: {{ deviceInfo.manufacturer }}</div>
-    <div>Virtual: {{ deviceInfo.isVirtual }}</div>
+    <div>Emulator: {{ deviceInfo.isVirtual ? "yes" : "no" }}</div>
   </center>
 </template>
-
-<style scoped>
-.pageTitle {
-  margin-bottom: 1em;
-}
-</style>
 
 <script>
 import { Browser } from "@capacitor/browser";
@@ -57,3 +55,9 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.pageTitle {
+  margin-bottom: 1em;
+}
+</style>
